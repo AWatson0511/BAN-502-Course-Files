@@ -1,0 +1,50 @@
+#Missing Data Assignment
+
+```{r}
+library(VIM)
+library(mice)
+library(tidyverse)
+
+class_grades <- read_csv("class-grades.csv")
+```
+```{r}
+grades <- class_grades
+
+summary(grades)
+str(grades)
+
+```
+#The data has some NA values, they can be seen on import.
+
+```{r}
+vim_plot = aggr(grades, numbers = TRUE, prop = c(TRUE, FALSE),cex.axis=.7)
+```
+##There are missing variables in Tutorial, Midterm, TakeHome, and Final. Looks like one student is missing more than one variable. 
+
+```{r}
+grades_rowdel = grades %>% drop_na()
+
+```
+
+##89 rows of data remain with rows deleted.
+
+```{r}
+grades_coldel = grades %>% select(where(~!any(is.na(.))))
+```
+
+##Only 2 variables remain. 
+
+###Deleting columns removed most of the data. I would delete rows in this instace. 
+
+```{r}
+set.seed(123)
+imp_grades = mice(grades, m=5, method='pmm', printFlag=FALSE)
+summary(imp_grades)
+```
+```{r}
+
+grades_complete = complete(imp_grades) 
+summary(grades_complete)
+```
+
+##The mean for Final is 68.33.

@@ -1,0 +1,278 @@
+---
+output:
+  word_document: default
+  html_document: default
+---
+#Class Tree Assignment
+```{r, include = FALSE}
+library(caret)
+library(tidyverse)
+library(tidymodels)
+library(rpart)
+library(rpart.plot)
+library(rattle)
+library(RColorBrewer)
+```
+
+```{r}
+parole <- read_csv("parole.csv")
+```
+```{r}
+parole = parole %>% mutate(violator = as_factor(violator))  %>%
+  mutate(male = as_factor(male)) %>% mutate(crime = as_factor(crime)) %>% mutate(multiple.offenses = as_factor(multiple.offenses)) %>% mutate(race = as_factor(race)) %>% mutate(male = as_factor(male)) %>% mutate(state = as_factor(state)) 
+```
+
+```{r}
+set.seed(12345)
+parole_split = initial_split(parole, prob = 0.70, strata = violator)
+train = training(parole_split)
+test = testing(parole_split)
+```
+
+```{r}
+violator_recipe = recipe(violator ~., train) %>%
+  step_dummy(all_nominal(),-all_outcomes())
+
+tree_model = decision_tree() %>% 
+  set_engine("rpart", model = TRUE) %>% 
+  set_mode("classification")
+
+violator_wflow = 
+  workflow() %>% 
+  add_model(tree_model) %>% 
+  add_recipe(violator_recipe)
+
+violator_fit = fit(violator_wflow, train)
+
+```
+
+```{r}
+tree = violator_fit %>% 
+  pull_workflow_fit() %>% 
+  pluck("fit")
+
+fancyRpartPlot(tree)
+
+fancyRpartPlot(tree, tweak=1.25)
+
+```
+
+##A 40 year old parolee from LA, served 5 years, sentenced for 10 years with multiple offenses. Start at the top of the tree: State = 3? Yes. Move left. State = 4? No, move right. Multiple Offenses = yes? Move left. 31% 
+
+```{r}
+violator_fit$fit$fit$fit$cptable
+```
+
+##The CP table shows 0.77 as the optimal CP. The tree above is not 0.77, it has 10 splits. 
+
+```{r}
+set.seed(123)
+folds = vfold_cv(train, v = 5)
+```
+
+```{r}
+violator_recipe = recipe(violator ~., train) %>%
+  step_dummy(all_nominal(),-all_outcomes())
+
+tree_model = decision_tree(cost_complexity = tune()) %>% 
+  set_engine("rpart", model = TRUE) %>% 
+  set_mode("classification")
+
+tree_grid = grid_regular(cost_complexity(),
+                          levels = 25) 
+
+violator_wflow = 
+  workflow() %>% 
+  add_model(tree_model) %>% 
+  add_recipe(violator_recipe)
+
+tree_res = 
+  violator_wflow %>% 
+  tune_grid(
+    resamples = folds,
+    grid = tree_grid
+    )
+
+tree_res
+
+```
+
+```{r}
+tree_res %>%
+  collect_metrics() %>%
+  ggplot(aes(cost_complexity, mean)) +
+  geom_line(size = 1.5, alpha = 0.6) +
+  geom_point(size = 2) +
+  facet_wrap(~ .metric, scales = "free", nrow = 2) 
+
+```
+
+```{r}
+best_tree = tree_res %>%
+  select_best("accuracy")
+
+best_tree
+
+```
+
+## CP value 0.1 is the best. 
+
+```{r}
+final_wf = 
+  violator_wflow %>% 
+  finalize_workflow(best_tree)
+
+```
+
+```{r}
+final_fit = fit(final_wf, train)
+
+tree = final_fit %>% 
+  pull_workflow_fit() %>% 
+  pluck("fit")
+
+
+```
+
+## I don't think that the model can be accurate because our data is so skewed. 0.1 is at the end of our graph above, there's no differentiation.
+
+#Task 9
+
+```{r}
+blood <- read_csv("Blood.csv")
+```
+
+```{r}
+blood = blood %>% mutate(DonatedMarch = as_factor(DonatedMarch)) %>% 
+  mutate(DonatedMarch = fct_recode(DonatedMarch, "No" = "0", "Yes" = "1" ))
+```
+
+```{r}
+set.seed(1234)
+blood_split = initial_split(blood, prob = 0.70, strata = DonatedMarch)
+train2 = training(blood_split)
+test2 = testing(blood_split)
+```
+
+```{r}
+blood_recipe = recipe(DonatedMarch ~., train2) %>%
+  step_dummy(all_nominal(),-all_outcomes())
+
+tree_model2 = decision_tree() %>% 
+  set_engine("rpart", model = TRUE) %>% 
+  set_mode("classification")
+
+blood_wflow = 
+  workflow() %>% 
+  add_model(tree_model2) %>% 
+  add_recipe(blood_recipe)
+
+blood_fit = fit(blood_wflow, train2)
+
+```
+
+
+```{r}
+tree2 = blood_fit %>% 
+  pull_workflow_fit() %>% 
+  pluck("fit")
+
+fancyRpartPlot(tree2)
+
+fancyRpartPlot(tree2, tweak=1.25)
+
+```
+
+```{r}
+blood_fit$fit$fit$fit$cptable
+```
+
+```{r}
+set.seed(1234)
+folds2 = vfold_cv(train2, v = 5)
+```
+
+```{r}
+blood_recipe = recipe(DonatedMarch ~., train2) %>%
+  step_dummy(all_nominal(),-all_outcomes())
+
+tree_model2 = decision_tree(cost_complexity = tune()) %>% 
+  set_engine("rpart", model = TRUE) %>% 
+  set_mode("classification")
+
+tree_grid2 = grid_regular(cost_complexity(),
+                          levels = 25) 
+
+blood_wflow = 
+  workflow() %>% 
+  add_model(tree_model2) %>% 
+  add_recipe(blood_recipe)
+
+tree_res2 = 
+  blood_wflow %>% 
+  tune_grid(
+    resamples = folds2,
+    grid = tree_grid2
+    )
+
+tree_res2
+
+```
+
+```{r}
+tree_res2 %>%
+  collect_metrics() %>%
+  ggplot(aes(cost_complexity, mean)) +
+  geom_line(size = 1.5, alpha = 0.6) +
+  geom_point(size = 2) +
+  facet_wrap(~ .metric, scales = "free", nrow = 2) 
+
+```
+
+##I think that 0.20 is the best for accuracy.
+
+```{r}
+best_tree2 = tree_res2 %>%
+  select_best("accuracy")
+
+best_tree2
+
+```
+
+```{r}
+final_wf = 
+  blood_wflow %>% 
+  finalize_workflow(best_tree2)
+```
+
+```{r}
+final_fit = fit(final_wf, train2)
+
+tree2 = final_fit %>% 
+  pull_workflow_fit() %>% 
+  pluck("fit")
+
+fancyRpartPlot(tree2, tweak = 1.5) 
+
+
+```
+
+```{r}
+treepred = predict(final_fit, train2, type = "class")
+head(treepred)
+```
+
+```{r}
+confusionMatrix(treepred$.pred_class,train2$DonatedMarch,positive="Yes")
+```
+## The prediction accuracy is 81% on the training set with a significant p value. 
+```{r}
+treepred_test = predict(final_fit, test2, type = "class")
+head(treepred_test)
+```
+
+```{r}
+confusionMatrix(treepred_test$.pred_class,test2$DonatedMarch,positive="Yes") 
+
+```
+##Accuracy on the test set went down to 76% and our p-value is no longer significant. If I were trying to run this model, I would question it's accuracy of prediction but I am so new at this I would also seek advice from someone else. :)

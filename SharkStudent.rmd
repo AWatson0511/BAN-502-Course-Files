@@ -1,0 +1,499 @@
+---
+output:
+  word_document: default
+  html_document: default
+---
+
+
+```{r, include=FALSE}
+library(tidyverse)
+library(tidymodels)
+library(caret)
+library(gridExtra)
+library(vip)
+library(ranger)
+library(naniar)
+library(ggplot2)
+library(skimr)
+library(VIM)
+library(GGally)
+library(lmtest)
+library(rpart)
+library(rpart.plot)
+library(rattle)
+library(RColorBrewer)
+```
+
+
+
+
+```{r}
+shark_student <- read_csv("shark_student.csv") 
+```
+```{r}
+shark_student <- shark_student %>% 
+  select(-X1) %>% 
+  mutate_if(is.character,as_factor) %>% 
+  mutate(ReceiveOffer = as_factor(ReceiveOffer)) %>%  
+  mutate(ReceiveOffer = fct_recode(ReceiveOffer, "No" = "0", "Yes" = "1" )) %>% 
+  mutate(RejectOffer = as_factor(RejectOffer)) %>%  
+  mutate(RejectOffer = fct_recode(RejectOffer, "No" = "0", "Yes" = "1" )) %>% 
+  mutate(Deal_Yes = as_factor(Deal_Yes)) %>%  
+  mutate(Deal_Yes = fct_recode(Deal_Yes, "No" = "0", "Yes" = "1" )) %>% 
+  mutate(Deal_No  = as_factor(Deal_No)) %>%  
+  mutate(Deal_No  = fct_recode(Deal_No, "No" = "0", "Yes" = "1" )) %>% 
+  mutate(Eth1  = as_factor(Eth1)) %>%  
+  mutate(Eth1  = fct_recode(Eth1, "African American" = "1", "White" = "2", "Asian" = "3", "Latino" = "4", "No presenter 1" = "0"))%>% 
+  mutate(Eth2  = as_factor(Eth2)) %>%  
+  mutate(Eth2  = fct_recode(Eth2, "African American" = "1", "White" = "2", "Asian" = "3", "Latino" = "4", "No presenter 2" = "0"))%>%  
+  mutate(Eth3  = as_factor(Eth3)) %>%  
+  mutate(Eth3  = fct_recode(Eth3, "African American" = "1", "White" = "2", "Asian" = "3", "Latino" = "4", "No presenter 3" = "0"))%>% 
+  mutate(Eth4  = as_factor(Eth4)) %>%  
+  mutate(Eth4  = fct_recode(Eth4, "African American" = "1", "White" = "2", "Asian" = "3", "Latino" = "4", "No presenter 4" = "0"))%>% 
+  mutate(Eth5  = as_factor(Eth5)) %>%  
+  mutate(Eth5  = fct_recode(Eth5, "African American" = "1", "White" = "2", "Asian" = "3", "Latino" = "4", "No presenter 5" = "0"))%>% 
+  mutate(Male1  = as_factor(Male1)) %>%  
+  mutate(Male1  = fct_recode(Male1, "No" = "0", "Yes" = "1" ))%>% 
+  mutate(Male2  = as_factor(Male2)) %>%  
+  mutate(Male2  = fct_recode(Male2, "No" = "0", "Yes" = "1" ))%>% 
+  mutate(Male3  = as_factor(Male3)) %>%  
+  mutate(Male3  = fct_recode(Male3, "No" = "0", "Yes" = "1" ))%>% 
+  mutate(Male4  = as_factor(Male4)) %>%  
+  mutate(Male4  = fct_recode(Male4, "No" = "0", "Yes" = "1" ))%>% 
+  mutate(Female1  = as_factor(Female1)) %>%  
+  mutate(Female1  = fct_recode(Female1, "No" = "0", "Yes" = "1" ))%>% 
+  mutate(Female2  = as_factor(Female2)) %>%  
+  mutate(Female2  = fct_recode(Female2, "No" = "0", "Yes" = "1" ))%>% 
+  mutate(Female3  = as_factor(Female3)) %>%  
+  mutate(Female3  = fct_recode(Female3, "No" = "0", "Yes" = "1" ))%>% 
+  mutate(Female4  = as_factor(Female4)) %>%  
+  mutate(Female4  = fct_recode(Female4, "No" = "0", "Yes" = "1" )) 
+```
+```{r}
+shark_student <- shark_student %>% 
+  rename("Food_Beverage"="Food and Beverage") %>% 
+  mutate(Food_Beverage  = as_factor(Food_Beverage)) %>%  
+  mutate(Food_Beverage  = fct_recode(Food_Beverage, "No" = "0", "Yes" = "1" ))%>% 
+  mutate(Novelties  = as_factor(Novelties)) %>%  
+  mutate(Novelties  = fct_recode(Novelties, "No" = "0", "Yes" = "1" )) %>% 
+  rename("Health_Wellness"="Health / Wellness") %>% 
+  mutate(Health_Wellness  = as_factor(Health_Wellness)) %>%  
+  mutate(Health_Wellness  = fct_recode(Health_Wellness, "No" = "0", "Yes" = "1" ))%>% 
+  rename("Lifestyle_Home"="Lifestyle / Home") %>% 
+  mutate(Lifestyle_Home  = as_factor(Lifestyle_Home)) %>%  
+  mutate(Lifestyle_Home  = fct_recode(Lifestyle_Home, "No" = "0", "Yes" = "1" ))%>% 
+  rename("Software_Tech"="Software / Tech") %>% 
+  mutate(Software_Tech  = as_factor(Software_Tech)) %>%  
+  mutate(Software_Tech  = fct_recode(Software_Tech, "No" = "0", "Yes" = "1" )) 
+
+shark_student <- shark_student %>% 
+  rename("Children_Education"="Children / Education") %>% 
+  mutate(Children_Education  = as_factor(Children_Education)) %>%  
+  mutate(Children_Education  = fct_recode(Children_Education, "No" = "0", "Yes" = "1" ))%>% 
+  mutate(Automotive  = as_factor(Automotive)) %>%  
+  mutate(Automotive  = fct_recode(Automotive, "No" = "0", "Yes" = "1" ))%>% 
+  rename("Fashion_Beauty"="Fashion / Beauty") %>% 
+ mutate(Fashion_Beauty  = as_factor(Fashion_Beauty)) %>%  
+  mutate(Fashion_Beauty  = fct_recode(Fashion_Beauty, "No" = "0", "Yes" = "1" ))%>% 
+  rename("Media_Entertainment"="Media / Entertainment") %>% 
+  mutate(Media_Entertainment = as_factor(Media_Entertainment)) %>%  
+  mutate(Media_Entertainment = fct_recode(Media_Entertainment, "No" = "0", "Yes" = "1" )) 
+
+shark_student <- shark_student %>% 
+  rename("Fitness_Sports_Outdoors"="Fitness / Sports / Outdoors") %>% 
+  mutate(Fitness_Sports_Outdoors = as_factor(Fitness_Sports_Outdoors)) %>%  
+  mutate(Fitness_Sports_Outdoors  = fct_recode(Fitness_Sports_Outdoors, "No" = "0", "Yes" = "1" ))%>% 
+  rename("Pet_Products" = "Pet Products") %>% 
+  mutate(Pet_Products  = as_factor(Pet_Products)) %>%  
+  mutate(Pet_Products  = fct_recode(Pet_Products, "No" = "0", "Yes" = "1" ))%>% 
+  rename("Business_Services" = "Business Services") %>% 
+  mutate(Business_Services  = as_factor(Business_Services)) %>%  
+  mutate(Business_Services  = fct_recode(Business_Services, "No" = "0", "Yes" = "1" ))%>% 
+  mutate(Travel  = as_factor(Travel)) %>%  
+  mutate(Travel  = fct_recode(Travel, "No" = "0", "Yes" = "1" )) 
+
+shark_student <- shark_student %>% 
+  rename("Green_CleanTech"="Green/CleanTech") %>% 
+  mutate(Green_CleanTech  = as_factor(Green_CleanTech)) %>%  
+  mutate(Green_CleanTech  = fct_recode(Green_CleanTech, "No" = "0", "Yes" = "1" ))%>% 
+  rename("Uncertain_Other"="Uncertain / Other") %>% 
+  mutate(Uncertain_Other = as_factor(Uncertain_Other)) %>%  
+  mutate(Uncertain_Other = fct_recode(Uncertain_Other, "No" = "0", "Yes" = "1" ))%>% 
+  mutate(MalePresenter  = as_factor(MalePresenter)) %>%  
+  mutate(MalePresenter  = fct_recode(MalePresenter, "No" = "0", "Yes" = "1" ))%>% 
+  mutate(FemalePresenter  = as_factor(FemalePresenter)) %>%  
+  mutate(FemalePresenter  = fct_recode(FemalePresenter, "No" = "0", "Yes" = "1" ))%>% 
+  mutate(MixedGenderPresenters  = as_factor(MixedGenderPresenters)) %>%  
+  mutate(MixedGenderPresenters  = fct_recode(MixedGenderPresenters, "No" = "0", "Yes" = "1" )) 
+
+shark_student <- shark_student%>% 
+  mutate(BarbaraCorcoran  = as_factor(BarbaraCorcoran)) %>%  
+  mutate(BarbaraCorcoran  = fct_recode(BarbaraCorcoran, "No" = "0", "Yes" = "1" ))%>% 
+  mutate(MarkCuban  = as_factor(MarkCuban)) %>%  
+  mutate(MarkCuban  = fct_recode(MarkCuban, "No" = "0", "Yes" = "1" ))%>% 
+  mutate(LoriGreiner  = as_factor(LoriGreiner)) %>%  
+  mutate(LoriGreiner  = fct_recode(LoriGreiner, "No" = "0", "Yes" = "1" ))%>% 
+  mutate(RobertHerjavec  = as_factor(RobertHerjavec)) %>%  
+  mutate(RobertHerjavec  = fct_recode(RobertHerjavec, "No" = "0", "Yes" = "1" ))%>% 
+  mutate(DaymondJohn  = as_factor(DaymondJohn)) %>%  
+  mutate(DaymondJohn  = fct_recode(DaymondJohn, "No" = "0", "Yes" = "1" ))%>% 
+  mutate(KevinOLeary  = as_factor(KevinOLeary)) %>%  
+  mutate(KevinOLeary  = fct_recode(KevinOLeary, "No" = "0", "Yes" = "1" ))%>% 
+  mutate(KevinHarrington  = as_factor(KevinHarrington)) %>%  
+  mutate(KevinHarrington  = fct_recode(KevinHarrington, "No" = "0", "Yes" = "1" )) 
+
+shark_student <- shark_student %>% 
+  mutate(Guest  = as_factor(Guest)) %>%  
+  mutate(Guest  = fct_recode(Guest, "No" = "0", "Yes" = "1" )) 
+
+shark_student <- shark_student %>% 
+  rename("NumberOfPresenters"="Number of Presenters")
+
+shark_student <- select(shark_student, -Male4)  
+shark_student <- shark_student %>% drop_na() 
+summary(shark_student) 
+```
+
+```{r}
+skim(shark_student) 
+```
+
+```{r}
+vim_plot = aggr(shark_student, numbers = TRUE, prop = c(TRUE, FALSE),cex.axis=.7) 
+
+ 
+
+set.seed(123)  
+shark_split = initial_split(shark_student, prop = 0.7, strata = Deal_Yes)  
+train = training(shark_split) 
+test = testing(shark_split) 
+
+shark_recipe = recipe(Deal_Yes ~., train) %>% 
+  step_dummy(all_nominal(), -all_outcomes()) 
+ 
+rf_model = rand_forest() %>%  
+  set_engine("ranger", importance = "permutation") %>% #added importance metric 
+  set_mode("classification") 
+ 
+shark_wflow =  
+  workflow() %>%  
+  add_model(rf_model) %>%  
+  add_recipe(shark_recipe) 
+ 
+set.seed(123) 
+shark_fit = fit(shark_wflow, train) 
+ 
+trainpredrf = predict(shark_fit, train) 
+head(trainpredrf) 
+```
+
+```{r}
+confusionMatrix(trainpredrf$.pred_class, train$Deal_Yes,  
+                positive = "Yes") 
+```
+```{r}
+testpredrf = predict(shark_fit, test) 
+head(testpredrf) 
+```
+
+```{r}
+confusionMatrix(testpredrf$.pred_class, test$Deal_Yes,  
+                positive = "Yes") 
+```
+
+```{r}
+shark_fit %>% pull_workflow_fit() %>% vip(geom = "point") 
+
+ 
+```
+```{r}
+p1 = ggplot(train, aes(x = AmountRequested,y = Deal_Yes)) + geom_boxplot() 
+
+p2 = ggplot(train, aes(x = EquityRequested, y = Deal_Yes)) + geom_boxplot() 
+
+p3 = ggplot(train, aes(x = ImpliedValuationRequested, y = Deal_Yes)) + geom_boxplot() 
+
+
+grid.arrange(p1,p2,p3) 
+ 
+```
+
+```{r}
+p1 = ggplot(train, aes(x = Company, fill = Deal_Yes)) + geom_bar() 
+
+p2 = ggplot(train, aes(x = SeasonEpisode, fill = Deal_Yes)) + geom_bar() 
+
+p3 = ggplot(train, aes(x = ReceiveOffer, fill = Deal_Yes)) + geom_bar() 
+
+p4 = ggplot(train, aes(x = RejectOffer, fill = Deal_Yes))+ geom_bar()
+
+grid.arrange(p1,p2,p3,p4)
+
+```
+
+```{r}
+p1 = ggplot(train, aes(x = Eth1, fill = Deal_Yes)) + geom_bar() + theme(axis.text.x = element_text(angle = 45))
+
+p2 = ggplot(train, aes(x = Eth2, fill = Deal_Yes)) + geom_bar() + theme(axis.text.x = element_text(angle = 45))
+
+
+grid.arrange(p1,p2)
+
+```
+```{r}
+p3 = ggplot(train, aes(x = Eth3, fill = Deal_Yes)) + geom_bar()+theme(axis.text.x = element_text(angle = 45))
+
+
+p4 = ggplot(train, aes(x = Eth4, fill = Deal_Yes))+ geom_bar() +theme(axis.text.x = element_text(angle = 45))
+
+
+grid.arrange(p3,p4)
+```
+
+```{r}
+
+p5 = ggplot(train, aes(x = Eth5, fill = Deal_Yes))+ geom_bar() +theme(axis.text.x = element_text(angle = 45))
+
+grid.arrange(p5)
+```
+
+```{r}
+p1 = ggplot(train, aes(x = Male1, fill = Deal_Yes)) + geom_bar() 
+
+p2 = ggplot(train, aes(x = Male2, fill = Deal_Yes)) + geom_bar() 
+
+p3 = ggplot(train, aes(x = Male3, fill = Deal_Yes)) + geom_bar() 
+
+p4 = ggplot(train, aes(x = Female1, fill = Deal_Yes))+ geom_bar()
+
+grid.arrange(p1,p2,p3,p4)
+```
+```{r}
+p1 = ggplot(train, aes(x = Female2, fill = Deal_Yes)) + geom_bar() 
+
+p2 = ggplot(train, aes(x = Female3, fill = Deal_Yes)) + geom_bar() 
+
+p3 = ggplot(train, aes(x = Female4, fill = Deal_Yes)) + geom_bar() 
+
+p4 = ggplot(train, aes(x = Novelties, fill = Deal_Yes))+ geom_bar()
+
+grid.arrange(p1,p2,p3,p4)
+```
+```{r}
+p1 = ggplot(train, aes(x = Health_Wellness, fill = Deal_Yes)) + geom_bar() 
+
+p2 = ggplot(train, aes(x = Food_Beverage, fill = Deal_Yes)) + geom_bar() 
+
+p3 = ggplot(train, aes(x = Business_Services, fill = Deal_Yes)) + geom_bar() 
+
+p4 = ggplot(train, aes(x = Lifestyle_Home, fill = Deal_Yes))+ geom_bar()
+
+grid.arrange(p1,p2,p3,p4)
+```
+
+```{r}
+p1 = ggplot(train, aes(x = Software_Tech, fill = Deal_Yes)) + geom_bar() 
+
+p2 = ggplot(train, aes(x = Children_Education, fill = Deal_Yes)) + geom_bar() 
+
+p3 = ggplot(train, aes(x = Automotive, fill = Deal_Yes)) + geom_bar() 
+
+p4 = ggplot(train, aes(x = Fashion_Beauty, fill = Deal_Yes))+ geom_bar()
+
+grid.arrange(p1,p2,p3,p4)
+```
+
+```{r}
+p1 = ggplot(train, aes(x = Media_Entertainment, fill = Deal_Yes)) + geom_bar() 
+
+p2 = ggplot(train, aes(x = Fitness_Sports_Outdoors, fill = Deal_Yes)) + geom_bar() 
+
+p3 = ggplot(train, aes(x = Pet_Products, fill = Deal_Yes)) + geom_bar() 
+
+p4 = ggplot(train, aes(x = Travel, fill = Deal_Yes))+ geom_bar()
+
+grid.arrange(p1,p2,p3,p4)
+```
+
+```{r}
+p1 = ggplot(train, aes(x = Green_CleanTech, fill = Deal_Yes)) + geom_bar() 
+
+p2 = ggplot(train, aes(x = Uncertain_Other, fill = Deal_Yes)) + geom_bar() 
+
+p3 = ggplot(train, aes(x = MalePresenter, fill = Deal_Yes)) + geom_bar() 
+
+p4 = ggplot(train, aes(x = FemalePresenter, fill = Deal_Yes))+ geom_bar()
+
+grid.arrange(p1,p2,p3,p4)
+```
+
+```{r}
+p1 = ggplot(train, aes(x = MixedGenderPresenters, fill = Deal_Yes)) + geom_bar() 
+
+p2 = ggplot(train, aes(x = CompanyState, fill = Deal_Yes)) + geom_bar() +theme(axis.text.x = element_text(angle = 90))
+
+
+
+grid.arrange(p1,p2)
+```
+
+```{r}
+p1 = ggplot(train, aes(x = BarbaraCorcoran, fill = Deal_Yes)) + geom_bar() 
+
+p2 = ggplot(train, aes(x = MarkCuban, fill = Deal_Yes)) + geom_bar() 
+
+p3 = ggplot(train, aes(x = LoriGreiner, fill = Deal_Yes)) + geom_bar() 
+
+p4 = ggplot(train, aes(x = RobertHerjavec, fill = Deal_Yes))+ geom_bar()
+
+grid.arrange(p1,p2,p3,p4)
+```
+
+```{r}
+p1 = ggplot(train, aes(x = DaymondJohn, fill = Deal_Yes)) + geom_bar() 
+
+p2 = ggplot(train, aes(x = KevinOLeary, fill = Deal_Yes)) + geom_bar() 
+
+p3 = ggplot(train, aes(x = KevinHarrington, fill = Deal_Yes)) + geom_bar() 
+
+p4 = ggplot(train, aes(x = Guest, fill = Deal_Yes))+ geom_bar()
+
+grid.arrange(p1,p2,p3,p4)
+```
+
+
+#Phase Two Starts Here
+
+```{r}
+deal_yes_recipe = recipe(Deal_Yes ~., train) %>%
+  step_dummy(all_nominal(),-all_outcomes())
+
+deal_yes_model = decision_tree() %>% 
+  set_engine("rpart", model = TRUE) %>% 
+  set_mode("classification")
+
+deal_yes_wflow = 
+  workflow() %>% 
+  add_model(deal_yes_model) %>% 
+  add_recipe(deal_yes_recipe)
+
+deal_yes_fit = fit(deal_yes_wflow, train)
+
+```
+
+```{r}
+tree = deal_yes_fit %>% 
+  pull_workflow_fit() %>% 
+  pluck("fit")
+
+fancyRpartPlot(tree)
+
+fancyRpartPlot(tree, tweak=1.25)
+
+
+```
+
+```{r}
+ggplot(shark_student, aes(AmountRequested, EquityRequested)) +geom_point() +geom_smooth(method="lm",se=FALSE, color="blue")
+
+ggcorr(shark_student, label=TRUE)
+
+```
+#This looks like a correlation! Positive relationship between the Amount Requested and Implied Valuation, and a Negative relationship between Equity Requested and Implied Valuation. 
+```{r}
+ggplot(shark_student, aes(AmountRequested, ImpliedValuationRequested)) +geom_point() +geom_smooth(method="lm",se=FALSE, color="blue")
+
+```
+
+```{r}
+ggplot(shark_student, aes(ImpliedValuationRequested, EquityRequested)) +geom_point() +geom_smooth(method="lm",se=FALSE, color="blue")
+
+```
+
+
+#Logistic Regressions
+```{r}
+shark_reg <- recipe(ImpliedValuationRequested ~ AmountRequested, shark_student)
+
+lm_model = 
+  linear_reg() %>% 
+  set_engine("lm")
+
+lm_wflow = 
+  workflow() %>% 
+  add_model(lm_model) %>% 
+  add_recipe(shark_reg)
+
+lm_fit = fit(lm_wflow, shark_student)
+
+summary(lm_fit$fit$fit$fit)
+
+```
+#p-value is significant, r-squared is 0.5455
+
+```{r}
+shark_reg2 <- recipe(ImpliedValuationRequested ~ EquityRequested, shark_student)
+
+lm_model2 = 
+  linear_reg() %>% 
+  set_engine("lm")
+
+lm_wflow2 = 
+  workflow() %>% 
+  add_model(lm_model2) %>% 
+  add_recipe(shark_reg2)
+
+lm_fit2 = fit(lm_wflow2, shark_student)
+
+summary(lm_fit2$fit$fit$fit)
+
+```
+
+#p-value is significant, r-squared is 0.1476. This is a weak correlation and I wouldn't use this.
+
+#A different version of the graph above without the blue line. 
+
+```{r}
+ggplot(shark_student, aes(x=ImpliedValuationRequested,y=AmountRequested)) + geom_point() + theme_bw()
+```
+
+```{r}
+recipe3 = recipe(ImpliedValuationRequested ~ EquityRequested + NumberOfPresenters + AmountRequested, shark_student)
+
+lm_model3 =  
+  linear_reg() %>%  
+  set_engine("lm")
+
+lm_wflow3 = 
+  workflow() %>% 
+  add_model(lm_model3) %>% 
+  add_recipe(recipe3)
+
+lm_fit3 = fit(lm_wflow3, shark_student)
+
+
+summary(lm_fit3$fit$fit$fit)
+
+```
+#When all numeric variables are run together, we have no significance with Number of Presenters, but our R-squared goes up to 0.6476. 
+
+```{r}
+recipe4 = recipe(ImpliedValuationRequested ~ EquityRequested + AmountRequested, shark_student)
+
+lm_model4 =  
+  linear_reg() %>%  
+  set_engine("lm")
+
+lm_wflow4 = 
+  workflow() %>% 
+  add_model(lm_model4) %>% 
+  add_recipe(recipe4)
+
+lm_fit4 = fit(lm_wflow4, shark_student)
+
+
+summary(lm_fit4$fit$fit$fit)
+
+```
+#The p-value is significant and the r-sqaured stayed high at 0.6479 when taking out the Number of Presenters variable. 
+
